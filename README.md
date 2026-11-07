@@ -33,7 +33,9 @@ See the game design document in the repo history/issue tracker for the full visi
 
 ## Godot prototype (third-person)
 
-The project is moving to **Godot 4** for the third-person, early-2000s (Max Payne / FEAR / Deus Ex) direction. Open the `godot/` folder in Godot 4.3+ (Import → select `godot/project.godot`) and press F5.
+The project is moving to **Godot 4** for the third-person, early-2000s (Max Payne / FEAR / Deus Ex) direction.
+
+First run: open the Godot **Project Manager** → **Import** → select `godot/project.godot` → **Import & Edit**, wait for the import to finish, then press **F5**. (Fresh-from-git projects always need this one-time import — the `.godot/` cache is not committed. If you see "Assets need to be imported first", you skipped this step.)
 
 Tuned for low-end / integrated-GPU machines:
 - GL Compatibility renderer, 640×360 internal resolution upscaled, CPU particles, simple meshes
