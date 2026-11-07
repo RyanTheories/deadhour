@@ -20,10 +20,92 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const W = canvas.width, H = canvas.height;
 
+// ---------- Pre-rendered painterly assets ----------
+// Floor texture: dark base with visible brush strokes and speckle, per the
+// style board's painterly noir surfaces.
+const floorTex = document.createElement("canvas");
+floorTex.width = W; floorTex.height = H;
+{
+  const c = floorTex.getContext("2d");
+  c.fillStyle = "#0a0d14";
+  c.fillRect(0, 0, W, H);
+  // broad cool-toned strokes
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random()*W, y = Math.random()*H;
+    const len = 60 + Math.random()*180, ang = Math.random()*Math.PI*2;
+    const warm = Math.random() < 0.2;
+    c.strokeStyle = warm
+      ? `rgba(${60+Math.random()*30|0},${40},${20},${0.04+Math.random()*0.05})`
+      : `rgba(${30+Math.random()*20|0},${40+Math.random()*20|0},${60+Math.random()*25|0},${0.05+Math.random()*0.07})`;
+    c.lineWidth = 8 + Math.random()*22;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(x + Math.cos(ang)*len, y + Math.sin(ang)*len);
+    c.stroke();
+  }
+  // speckle
+  for (let i = 0; i < 1400; i++) {
+    c.fillStyle = Math.random() < 0.5 ? "rgba(140,150,180,0.05)" : "rgba(0,0,0,0.14)";
+    c.fillRect(Math.random()*W, Math.random()*H, 1.5, 1.5);
+  }
+}
+
+// Skyline backdrop for title / end screens: dark skyscrapers with scattered
+// lit windows and a cold glow, matching the style board's night cityscapes.
+const skylineTex = document.createElement("canvas");
+skylineTex.width = W; skylineTex.height = H;
+{
+  const c = skylineTex.getContext("2d");
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "#05070d");
+  sky.addColorStop(1, "#101826");
+  c.fillStyle = sky;
+  c.fillRect(0, 0, W, H);
+  // cold ambient glow behind the skyline
+  const glow = c.createRadialGradient(W/2, H*0.72, 20, W/2, H*0.72, H*0.8);
+  glow.addColorStop(0, "rgba(90,120,160,0.18)");
+  glow.addColorStop(1, "rgba(90,120,160,0)");
+  c.fillStyle = glow;
+  c.fillRect(0, 0, W, H);
+  // building silhouettes, far then near
+  for (let layer = 0; layer < 2; layer++) {
+    let x = -20;
+    while (x < W + 20) {
+      const bw = 50 + Math.random()*110;
+      const bh = (layer === 0 ? 180 : 280) + Math.random()*160;
+      const by = H - bh;
+      c.fillStyle = layer === 0 ? "#0b0f18" : "#070a10";
+      c.fillRect(x, by, bw, bh);
+      // lit windows
+      const cols = Math.floor(bw/14), rows = Math.floor(bh/18);
+      for (let wx = 0; wx < cols; wx++) for (let wy = 0; wy < rows; wy++) {
+        if (Math.random() < 0.10) {
+          c.fillStyle = Math.random() < 0.75 ? "rgba(255,190,90,0.85)" : "rgba(140,215,255,0.8)";
+          c.fillRect(x + 4 + wx*14, by + 6 + wy*18, 6, 8);
+        }
+      }
+      x += bw + 4 + Math.random()*14;
+    }
+  }
+  // rooftop figure silhouette (foreground, off-center)
+  c.fillStyle = "#04060a";
+  c.beginPath();
+  c.ellipse(W*0.78, H*0.94, 26, 60, 0, 0, Math.PI*2); c.fill();
+  c.beginPath();
+  c.arc(W*0.78, H*0.80, 13, 0, Math.PI*2); c.fill();
+  // coat tails
+  c.beginPath();
+  c.moveTo(W*0.78 - 14, H*0.88);
+  c.quadraticCurveTo(W*0.78 - 40, H*1.0, W*0.78 - 20, H*1.02);
+  c.lineTo(W*0.78 + 14, H*0.9);
+  c.closePath(); c.fill();
+}
+
 // ---------- Global state ----------
 let timescale = 1;            // world timescale, lerped by bullet time
 let targetTimescale = 1;
-let gameState = "playing";    // playing | win | lose
+let gameState = "title";      // title | playing | win | lose
 let frame = 0;
 const keys = {};
 const mouse = { x: W/2, y: H/2, down: false, right: false };
@@ -322,32 +404,63 @@ function update(rawDt) {
 let hitStop = 0;
 
 // ---------- Render ----------
+function drawTitleScreen() {
+  ctx.drawImage(skylineTex, 0, 0);
+  // rain over the skyline
+  ctx.strokeStyle = "rgba(160,180,210,0.16)"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const d of rain) { ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - 1.2, d.y - d.len); }
+  ctx.stroke();
+  // vignette
+  const vg = ctx.createRadialGradient(W/2, H/2, H/3, W/2, H/2, H*0.85);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,0.6)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#e8dcc0";
+  ctx.font = "bold 72px Georgia, serif";
+  ctx.fillText("DEADHOUR", W/2, H*0.34);
+  ctx.fillStyle = "rgba(200,210,230,0.55)";
+  ctx.font = "italic 18px Georgia, serif";
+  ctx.fillText("one night. one rampage. no witnesses.", W/2, H*0.34 + 36);
+  ctx.fillStyle = "rgba(220,220,220,0.75)";
+  ctx.font = "16px Georgia, serif";
+  ctx.fillText("Press Enter", W/2, H*0.34 + 90);
+}
+
 function draw() {
+  if (gameState === "title") { drawTitleScreen(); return; }
   ctx.save();
   const sx = (Math.random()-0.5)*shake, sy = (Math.random()-0.5)*shake;
   ctx.translate(sx, sy);
 
-  // floor
-  ctx.fillStyle = "#0d0f14";
-  ctx.fillRect(-10, -10, W+20, H+20);
-
-  // checkerboard marble hint
-  ctx.globalAlpha = 0.06;
+  // floor: painterly texture drawn from the pre-rendered canvas
+  ctx.drawImage(floorTex, -10, -10, W+20, H+20);
+  // faint checkerboard marble hint
+  ctx.globalAlpha = 0.05;
   for (let y = 24; y < H-24; y += 40)
     for (let x = 24; x < W-24; x += 40)
       if (((x/40)+(y/40)) % 2 === 0) { ctx.fillStyle = "#aab"; ctx.fillRect(x, y, 40, 40); }
   ctx.globalAlpha = 1;
 
-  // light pools (wet specular streaks)
+  // light pools: soft painterly glow + wet specular streak
   for (const L of lights) {
     const g = ctx.createRadialGradient(L.x, L.y, 10, L.x, L.y, L.r);
-    g.addColorStop(0, L.color + "0.22)");
+    g.addColorStop(0, L.color + "0.26)");
+    g.addColorStop(0.5, L.color + "0.10)");
     g.addColorStop(1, L.color + "0)");
     ctx.fillStyle = g;
     ctx.fillRect(L.x - L.r, L.y - L.r, L.r*2, L.r*2);
-    // specular streak
-    ctx.fillStyle = L.color + "0.07)";
-    ctx.fillRect(L.x - L.r/2, L.y - 6, L.r, 12);
+    // hot core
+    const core = ctx.createRadialGradient(L.x, L.y, 2, L.x, L.y, L.r*0.25);
+    core.addColorStop(0, L.color + "0.30)");
+    core.addColorStop(1, L.color + "0)");
+    ctx.fillStyle = core;
+    ctx.fillRect(L.x - L.r, L.y - L.r, L.r*2, L.r*2);
+    // specular streak on wet floor
+    ctx.fillStyle = L.color + "0.08)";
+    ctx.fillRect(L.x - L.r/2, L.y - 5, L.r, 10);
   }
 
   // decals (blood)
@@ -481,7 +594,8 @@ function drawHUD() {
 }
 
 function drawEndScreen() {
-  ctx.fillStyle = "rgba(5,6,10,0.75)";
+  ctx.drawImage(skylineTex, 0, 0);
+  ctx.fillStyle = "rgba(5,6,10,0.68)";
   ctx.fillRect(0, 0, W, H);
   ctx.textAlign = "center";
   ctx.fillStyle = gameState === "win" ? "#e8dcc0" : "#c04848";
@@ -508,6 +622,13 @@ function loop(now) {
   const rawDt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (gameState === "playing") update(rawDt);
+  else {
+    for (const d of rain) {
+      d.y += d.speed * rawDt; d.x += 60 * rawDt;
+      if (d.y > H) { d.y = -20; d.x = Math.random()*W; }
+      if (d.x > W) d.x = 0;
+    }
+  }
   draw();
   requestAnimationFrame(loop);
 }
