@@ -31,6 +31,19 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 
 See the game design document in the repo history/issue tracker for the full vision, art direction, and iteration roadmap (Build 0 → Build 4).
 
+## Godot prototype (third-person)
+
+The project is moving to **Godot 4** for the third-person, early-2000s (Max Payne / FEAR / Deus Ex) direction. Open the `godot/` folder in Godot 4.3+ (Import → select `godot/project.godot`) and press F5.
+
+Tuned for low-end / integrated-GPU machines:
+- GL Compatibility renderer, 640×360 internal resolution upscaled, CPU particles, simple meshes
+- Third-person over-the-shoulder camera, mouse look (click to capture the mouse)
+- Same controls as the Canvas PoC, plus: WASD move, mouse aim, LMB shoot, R reload, Space dive, Q/RMB bullet time, Enter restart
+- Bullet time uses separate world (25%) and player (40%) timescales instead of `Engine.time_scale`, so the player keeps a deliberate edge
+- Noir environment: near-black ambient, sodium streetlamp with shadows, cyan/orange neon spill, rain, fog
+
+The original single-file Canvas PoC (`index.html`) stays in the repo root as the Build 0 reference.
+
 ## Tech
 
 Single-file HTML5 Canvas + vanilla JavaScript. 60 fps loop with a global `timescale` that bullet time lerps. Iterate freely — everything is in `index.html`.
